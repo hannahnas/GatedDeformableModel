@@ -1,9 +1,7 @@
 import torch
 from torch import nn, optim
-import torchvision
 import pytorch_lightning as pl
 from modules import GatedConv2dWithActivation, DeformableConvWithActivation, UpConvWithActivation, ConvWithActivation, GatedDeformConvWithActivation
-from deform_conv.modules.deform_conv import DeformConvPack
 from criterions import mse_loss, ssim_loss, mae_loss
 
 
@@ -34,35 +32,30 @@ class LateFusionInpaintModel(pl.LightningModule):
         rgb_hat = self.inpaint_rgb(features)
         depth_hat = self.inpaint_depth(features)
 
-        # rgbd = torch.cat([rgb_hat, depth_hat], dim=1)
-
         return rgb_hat, depth_hat
 
     def _get_reconstruction_loss(self, batch):
-        rgb_gt, depth_gt = batch['rgb'], batch['depth']
+        rgb_gt, depth_gt, door_window, loss_masks = batch['rgb'], batch[
+            'depth'], batch['door/window'], batch['loss mask']
         rgb_pred, depth_pred = self.forward(batch)
-        l1_rgb = mae_loss(rgb_pred, rgb_gt)
+
+        # color
+        l1_rgb = mae_loss(rgb_pred, rgb_gt, loss_masks)
         self.log('L1 RGB', l1_rgb)
-        ssim_rgb = ssim_loss(rgb_pred, rgb_gt)
+        ssim_rgb = ssim_loss(rgb_pred, rgb_gt, loss_masks)
         self.log('SSIM RGB', ssim_rgb)
-        l1_depth = mae_loss(depth_pred, depth_gt)
+
+        # depth
+        l1_depth = mae_loss(depth_pred, depth_gt, loss_masks, door_window)
         self.log('L1 depth', l1_depth)
 
-        loss = 0.5 * l1_rgb + 0.5 * ssim_rgb + l1_depth
+        loss = 0.5 * ssim_rgb + 0.5 * l1_rgb + l1_depth
 
         return loss
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=1e-3)
-        # Using a scheduler is optional but can be helpful.
-        # The scheduler reduces the LR if the validation performance hasn't improved for the last N epochs
 
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-        #                                                  mode='min',
-        #                                                  factor=0.2,
-        #                                                  patience=20,
-        #                                                  min_lr=5e-5)
-        # return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
         return {"optimizer": optimizer, "monitor": "val_loss"}
 
     def training_step(self, batch, batch_idx):
@@ -121,9 +114,7 @@ class GatedDeformEncDec(nn.Module):
         )
 
     def forward(self, inputs, masks):
-        masked_imgs = inputs * (1 - masks) + masks
-        # input_imgs = torch.cat(
-        #     [masked_imgs, masks, torch.full_like(masks, 1.)], dim=1)
+        masked_imgs = inputs * (1 - masks)
 
         conv0 = self.EncBlock0(masked_imgs)  # B, L, 128, 128
 
@@ -151,7 +142,8 @@ class Inpainter(nn.Module):
         self.net = nn.Sequential(
             ConvWithActivation(in_channels, in_channels//2, 3),
             ConvWithActivation(in_channels//2, in_channels//4, 3),
-            nn.Conv2d(in_channels//4, out_channels, 3, padding=1)
+            nn.Conv2d(in_channels//4, out_channels, 3, padding=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
@@ -178,5 +170,4 @@ if __name__ == '__main__':
     }
 
     model = LateFusionInpaintModel().to('cuda')
-    rgbd = model(batch)
-    print(rgbd.shape)
+    rgb, d = model(batch)
