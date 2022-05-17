@@ -23,9 +23,9 @@ class GatedConv2dWithActivation(nn.Module):
         self.batch_norm2d = torch.nn.BatchNorm2d(out_channels)
         self.sigmoid = torch.nn.Sigmoid()
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.kaiming_normal_(m.weight)
 
     def gated(self, mask):
         # return torch.clamp(mask, -1, 1)
@@ -121,9 +121,9 @@ class GatedDeformConvWithActivation(nn.Module):
         self.batch_norm2d = torch.nn.BatchNorm2d(out_channels)
         self.sigmoid = torch.nn.Sigmoid()
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.kaiming_normal_(m.weight)
 
     def gated(self, mask):
         # return torch.clamp(mask, -1, 1)

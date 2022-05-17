@@ -7,17 +7,21 @@ from criterions import mse_loss, ssim_loss, mae_loss
 
 class LateFusionInpaintModel(pl.LightningModule):
 
-    def __init__(self):
+    def __init__(self, fusion=True):
         super().__init__()
+        self.fusion = fusion
 
         self.rgb_enc_dec = GatedDeformEncDec(
             in_channels=3, latent=32, upsample_mode='bilinear')
         self.depth_enc_dec = GatedDeformEncDec(
             in_channels=1, latent=16, upsample_mode='nearest')
 
-        self.inpaint_rgb = Inpainter(in_channels=48, out_channels=3)
+        self.inpaint_rgb = Inpainter(
+            in_channels=48 if fusion else 32, out_channels=3)
+        self.inpaint_depth = Inpainter(
+            in_channels=48 if fusion else 16, out_channels=1)
 
-        self.inpaint_depth = Inpainter(in_channels=48, out_channels=1)
+        self._init_params()
 
     def forward(self, batch):
         rgb = batch['rgb']
@@ -27,12 +31,27 @@ class LateFusionInpaintModel(pl.LightningModule):
         color_feat = self.rgb_enc_dec(rgb, masks)
         depth_feat = self.depth_enc_dec(depth, masks)
 
-        features = torch.cat((color_feat, depth_feat), dim=1)
+        if self.fusion:
+            features = torch.cat((color_feat, depth_feat), dim=1)
 
-        rgb_hat = self.inpaint_rgb(features)
-        depth_hat = self.inpaint_depth(features)
+            rgb_hat = self.inpaint_rgb(features)
+            depth_hat = self.inpaint_depth(features)
+        else:
+            rgb_hat = self.inpaint_rgb(color_feat)
+            depth_hat = self.inpaint_depth(depth_feat)
 
         return rgb_hat, depth_hat
+
+    def _init_params(self):
+        # Based on our discussion in Tutorial 4, we should initialize the convolutions according to the activation function
+        # Fan-out focuses on the gradient distribution, and is commonly used in ResNets
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def _get_reconstruction_loss(self, batch):
         rgb_gt, depth_gt, door_window, loss_masks = batch['rgb'], batch[
@@ -54,7 +73,7 @@ class LateFusionInpaintModel(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = optim.Adam(self.parameters(), lr=1e-4)
 
         return {"optimizer": optimizer, "monitor": "val_loss"}
 
@@ -104,8 +123,8 @@ class GatedDeformEncDec(nn.Module):
         )
 
         self.DecBlock1 = nn.Sequential(
-            UpConvWithActivation(2*2*latent, latent, 3, 2, upsample_mode),
-            ConvWithActivation(latent, latent, 3),
+            UpConvWithActivation(2*2*latent, 2*latent, 3, 2, upsample_mode),
+            ConvWithActivation(2*latent, latent, 3),
         )
 
         self.DecBlock0 = nn.Sequential(
@@ -169,5 +188,5 @@ if __name__ == '__main__':
         'batch size': 1
     }
 
-    model = LateFusionInpaintModel().to('cuda')
+    model = LateFusionInpaintModel(fusion=True).to('cuda')
     rgb, d = model(batch)

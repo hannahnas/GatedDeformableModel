@@ -79,7 +79,7 @@ def train(hyper_params, train_loader, val_loader, test_loader, train_set):
     # Optional logging argument that we don't need
     trainer.logger._default_hp_metric = None
 
-    model = LateFusionInpaintModel()
+    model = LateFusionInpaintModel(fusion=hyper_params['fusion'])
 
     trainer.fit(model, train_loader, val_loader)
 
@@ -142,10 +142,20 @@ def run_experiment(hyper_params):
 if __name__ == '__main__':
     hyper_params = {
         'model name': 'MaskedGatedDeformLateFusion',
-        'epochs': 50,
+        'epochs': 400,
         'activation': nn.ReLU,
         'resize': 128,
-        'batch size': 8
+        'batch size': 32,
+        'fusion': True
+    }
+
+    hyper_params = {
+        'model name': 'MaskedGatedDeformLateFusion',
+        'epochs': 400,
+        'activation': nn.ReLU,
+        'resize': 128,
+        'batch size': 32,
+        'fusion': False
     }
 
     model, result = run_experiment(hyper_params)

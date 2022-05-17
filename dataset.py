@@ -119,6 +119,7 @@ if __name__ == '__main__':
         bool_index = batch['loss mask'].repeat(
             1, 3, 1, 1)
         print(bool_index.shape)
+
         cropped = batch['rgb'][bool_index.bool()].reshape(8, 3, 48, 48)
         print(cropped.shape)
         fig, ax = plt.subplots(1, 3)
