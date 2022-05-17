@@ -141,7 +141,7 @@ def run_experiment(hyper_params):
 
 if __name__ == '__main__':
     hyper_params = {
-        'model name': 'TestVisGatedDeformLateFusion',
+        'model name': 'MaskedGatedDeformLateFusion',
         'epochs': 50,
         'activation': nn.ReLU,
         'resize': 128,
