@@ -37,19 +37,22 @@ def inference(model, data, device=device):
     return rgb_out, depth_out
 
 if __name__ == '__main__':
-    model_path = './checkpoints/GatedDeformLateFusion_epochs200_activationReLU/lightning_logs/version_0/checkpoints/epoch=128-step=10964.ckpt'
+    # model_path = './checkpoints/GatedDeformLateFusion_epochs200_activationReLU/lightning_logs/version_0/checkpoints/epoch=128-step=10964.ckpt'
+    model_path = './checkpoints/GatedDeformLateFusion_epochs600_activationReLU/lightning_logs/version_0/checkpoints/epoch=535-step=45559.ckpt'
+    # model_path = './checkpoints/MaskedGatedDeformLateFusion_epochs300_activationReLU/lightning_logs/version_0/checkpoints/epoch=269-step=34559.ckpt'
 
     hyper_params = {
         'model name': 'GatedDeformLateFusion',
         'epochs': 128,
         'activation': nn.ReLU,
         'resize': 128,
-        'batch size': 12
+        'batch size': 8
     }
 
     if os.path.isfile(model_path):
         print(f"Found pretrained model at {model_path}, loading...")
-        model = LateFusionInpaintModel.load_from_checkpoint(model_path) # Automatically loads the model with the saved hyperparameters
+        model = LateFusionInpaintModel(fusion=True)
+        model = model.load_from_checkpoint(model_path) # Automatically loads the model with the saved hyperparameters
         model = model.to(device)
         model.eval()
 
@@ -67,12 +70,17 @@ if __name__ == '__main__':
         batch['rgb'] = batch['rgb'].to(device)
         batch['depth'] = batch['depth'].to(device)
         batch['mask'] = batch['mask'].to(device)
+
         reconst_rgb, reconst_depth = model(batch)
-        reconst_rgb, reconst_depth = reconst_rgb.permute(0, 2, 3, 1).cpu().detach().numpy()[0], reconst_depth.cpu().detach().numpy()[0, 0]
-        rgb_gt, depth_gt = batch['rgb'].permute(0, 2, 3, 1).cpu().detach().numpy()[0], batch['depth'].cpu().detach().numpy()[0, 0]
-        print(rgb_gt.shape)
-        print(depth_gt.shape)
-        plot_RGBD_o3d(rgb_gt, depth_gt)
+        completed_rgb = batch['rgb'] * (1 - batch['mask']) + reconst_rgb * batch['mask'] 
+        completed_depth = batch['depth'] * (1 - batch['mask']) + reconst_depth * batch['mask']
+
+        completed_rgb, completed_depth = completed_rgb.permute(0, 2, 3, 1).cpu().detach().numpy()[0], completed_depth.cpu().detach().numpy()[0, 0]
+
+        # rgb_gt, depth_gt = batch['rgb'].permute(0, 2, 3, 1).cpu().detach().numpy()[0], batch['depth'].cpu().detach().numpy()[0, 0]
+        print(completed_rgb.shape)
+        print(completed_depth.shape)
+        plot_RGBD_o3d(completed_rgb*255, completed_depth)
         break
     #     # plot_RGBD(rgb_gt, depth_gt)
     #     color_gt, depth_gt = read_hypersim_numpy(DATA_FOLDER, volume_scene='ai_007_004', cam='cam_02', frame=10)

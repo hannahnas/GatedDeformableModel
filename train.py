@@ -142,19 +142,22 @@ def run_experiment(hyper_params):
 if __name__ == '__main__':
     hyper_params = {
         'model name': 'MaskedGatedDeformLateFusion',
-        'epochs': 400,
+        'epochs': 300,
         'activation': nn.ReLU,
         'resize': 128,
-        'batch size': 32,
+        'batch size': 8,
         'fusion': True
     }
+    model, result = run_experiment(hyper_params)
+
+    print(result)
 
     hyper_params = {
-        'model name': 'MaskedGatedDeformLateFusion',
-        'epochs': 400,
+        'model name': 'MaskedGatedDeformNoFusion',
+        'epochs': 300,
         'activation': nn.ReLU,
         'resize': 128,
-        'batch size': 32,
+        'batch size': 8,
         'fusion': False
     }
 

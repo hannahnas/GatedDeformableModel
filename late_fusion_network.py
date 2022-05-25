@@ -123,8 +123,8 @@ class GatedDeformEncDec(nn.Module):
         )
 
         self.DecBlock1 = nn.Sequential(
-            UpConvWithActivation(2*2*latent, 2*latent, 3, 2, upsample_mode),
-            ConvWithActivation(2*latent, latent, 3),
+            UpConvWithActivation(2*2*latent, latent, 3, 2, upsample_mode),
+            ConvWithActivation(latent, latent, 3),
         )
 
         self.DecBlock0 = nn.Sequential(
